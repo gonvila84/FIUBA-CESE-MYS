@@ -1,0 +1,8 @@
+# compile vhdl design source files
+vhdl xil_defaultlib  \
+"../../../../../../../sources/cont4b_Lento.vhd" \
+"../../../../../../../ip_repo/upDownCounter_1.0/hdl/upDownCounter_v1_0_S_AXI.vhd" \
+"../../../../../../../ip_repo/upDownCounter_1.0/hdl/upDownCounter_v1_0.vhd" \
+
+# Do not sort compile order
+nosort
