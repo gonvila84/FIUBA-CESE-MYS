@@ -1,0 +1,202 @@
+/******************************************************************************
+*
+* Copyright (C) 2009 - 2014 Xilinx, Inc.  All rights reserved.
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy
+* of this software and associated documentation files (the "Software"), to deal
+* in the Software without restriction, including without limitation the rights
+* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+* copies of the Software, and to permit persons to whom the Software is
+* furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in
+* all copies or substantial portions of the Software.
+*
+* Use of the Software is limited solely to applications:
+* (a) running on a Xilinx device, or
+* (b) that interact with a Xilinx device through a bus or interconnect.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+* XILINX  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+* WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+* OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+* SOFTWARE.
+*
+* Except as contained in this notice, the name of the Xilinx shall not be used
+* in advertising or otherwise to promote the sale, use or other dealings in
+* this Software without prior written authorization from Xilinx.
+*
+******************************************************************************/
+
+/*
+ *		Brief:			Contador UP/DOWN controlado por UART
+ *		Description:	Se controla un IP Core que implementa un contador UP/DOWN basado en VHDL
+ */
+
+#include <stdio.h>
+#include <unistd.h>
+#include "platform.h"
+#include "xil_printf.h"
+#include "upDownCounter.h"
+#include "xil_io.h"
+#include "xuartps.h"
+#include "stdbool.h"
+
+#define		COUNTER_RESET_ON			1
+#define		COUNTER_RESET_OFF			0
+#define		COUNTER_ENABLE_ON			1
+#define		COUNTER_ENABLE_OFF			0
+#define		START_COUNT_UP				6
+#define		START_COUNT_DOWN			2
+
+#define		COUNTER_START_NUMBER		0
+#define		COUNTER_PREVIOUS_NUMBER		99
+
+#define		TERMINAL_COMMAND_CLEAR_TERM							"\033[2J"
+#define		TERMINAL_COMMAND_RETURN_TO_ORIGIN					"\033[0;0f"
+#define		TERMINAL_COMMAND_ERASE_LINE							"\e[J"
+
+#define		ASCII_LOWER_X										120
+#define		ASCII_LOWER_R										114
+#define		ASCII_LOWER_E										101
+
+#define		TERMINAL_ERASE_LINE			"                                                                                         \r"
+
+typedef enum {UP = 1, DOWN = 0} counterDirection_t;
+typedef bool	bool_t;
+
+void printBanner();
+void printResult(int result, counterDirection_t direction);
+void invertDirection();
+void counterRestart();
+void counterContinue(counterDirection_t direction);
+void counterDisable();
+
+
+int main()
+{
+	int 	previousResult 				= COUNTER_PREVIOUS_NUMBER;
+	int 	result 						= COUNTER_START_NUMBER;
+	char	keyAscii;
+	bool_t	isEnabled = true;
+
+	counterDirection_t direction		= UP;
+
+
+	printBanner();
+
+    UPDOWNCOUNTER_mWriteReg(XPAR_UPDOWNCOUNTER_S_AXI_BASEADDR, UPDOWNCOUNTER_S_AXI_SLV_REG0_OFFSET, COUNTER_RESET_ON);
+
+
+    UPDOWNCOUNTER_mWriteReg(XPAR_UPDOWNCOUNTER_S_AXI_BASEADDR, UPDOWNCOUNTER_S_AXI_SLV_REG0_OFFSET, START_COUNT_UP);
+
+    while(1)
+    {
+
+    	do {
+
+    		result = UPDOWNCOUNTER_mReadReg(XPAR_UPDOWNCOUNTER_S_AXI_BASEADDR, UPDOWNCOUNTER_S_AXI_SLV_REG1_OFFSET);
+
+    	} while ( result == previousResult);
+
+    	if (XUartPs_IsReceiveData(XPAR_PS7_UART_0_BASEADDR))
+    	{
+    		keyAscii = XUartPs_RecvByte(XPAR_PS7_UART_0_BASEADDR);
+    		switch (keyAscii)
+    		{
+    			case ASCII_LOWER_X:
+    				direction = ~ direction;
+    				invertDirection();
+    				break;
+    			case ASCII_LOWER_R:
+    				counterRestart();
+    				counterContinue(direction);
+    				break;
+    			case ASCII_LOWER_E:
+    				if (isEnabled)
+    				{
+    					isEnabled = false;
+    					counterDisable();
+    				}
+    				else
+    				{
+    					counterContinue(direction);
+    					isEnabled = true;
+    				}
+    				break;
+    			default:
+    				break;
+    		}
+
+    	}
+
+    	previousResult = result;
+    	printResult(result, direction);
+    }
+
+    return 0;
+}
+
+
+void printBanner()
+{
+	xil_printf(TERMINAL_COMMAND_CLEAR_TERM);
+	xil_printf(TERMINAL_COMMAND_RETURN_TO_ORIGIN);
+	print("***************************************************************************\n\r");
+    print("Asignatura: 	Microarquitecturas y Softcores.\n\r");
+    print("Titulo: 	Up Down counter controlado por UART.\n\r");
+    print("Alumno: 	Gonzalo Vila.\n\r");
+	print("***************************************************************************\n\n\n\n\r");
+}
+
+void printResult(int result, counterDirection_t direction)
+{
+	xil_printf(TERMINAL_COMMAND_ERASE_LINE);
+	if (direction == UP)
+	{
+		xil_printf("Contador: %d			Direccion: UP ( presione 'x' para invertir el sentido de la cuenta, 'r' para reiniciar, 'e' para habilitar/deshabilitar )\r",result);
+	}
+	else
+	{
+		xil_printf("Contador: %d			Direccion: DOWN ( presione 'x' para invertir el sentido de la cuenta, 'r' para reiniciar, 'e' para habilitar/deshabilitar  )\r",result);
+	}
+}
+
+void invertDirection()
+{
+	int commandRegister;
+	commandRegister = UPDOWNCOUNTER_mReadReg(XPAR_UPDOWNCOUNTER_S_AXI_BASEADDR, UPDOWNCOUNTER_S_AXI_SLV_REG0_OFFSET);
+
+	if (commandRegister >= 4 && commandRegister <= 7)
+	{
+		UPDOWNCOUNTER_mWriteReg(XPAR_UPDOWNCOUNTER_S_AXI_BASEADDR, UPDOWNCOUNTER_S_AXI_SLV_REG0_OFFSET, START_COUNT_DOWN);
+	}
+	else
+	{
+	    UPDOWNCOUNTER_mWriteReg(XPAR_UPDOWNCOUNTER_S_AXI_BASEADDR, UPDOWNCOUNTER_S_AXI_SLV_REG0_OFFSET, START_COUNT_UP);
+	}
+}
+
+void counterDisable()
+{
+	UPDOWNCOUNTER_mWriteReg(XPAR_UPDOWNCOUNTER_S_AXI_BASEADDR, UPDOWNCOUNTER_S_AXI_SLV_REG0_OFFSET, COUNTER_ENABLE_OFF);
+}
+
+void counterRestart()
+{
+	UPDOWNCOUNTER_mWriteReg(XPAR_UPDOWNCOUNTER_S_AXI_BASEADDR, UPDOWNCOUNTER_S_AXI_SLV_REG0_OFFSET, COUNTER_RESET_ON);
+}
+
+void counterContinue(counterDirection_t direction)
+{
+	if (direction == UP)
+	{
+		UPDOWNCOUNTER_mWriteReg(XPAR_UPDOWNCOUNTER_S_AXI_BASEADDR, UPDOWNCOUNTER_S_AXI_SLV_REG0_OFFSET, START_COUNT_UP);
+	}
+	else
+	{
+		UPDOWNCOUNTER_mWriteReg(XPAR_UPDOWNCOUNTER_S_AXI_BASEADDR, UPDOWNCOUNTER_S_AXI_SLV_REG0_OFFSET, START_COUNT_DOWN);
+	}
+}

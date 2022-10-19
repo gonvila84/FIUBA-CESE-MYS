@@ -1,0 +1,9 @@
+vhdl xil_defaultlib  \
+"../../../bd/system/sim/system.vhd" \
+"../../../bd/system/ip/system_rst_ps7_0_100M_0/sim/system_rst_ps7_0_100M_0.vhd" \
+"../../../bd/system/ipshared/0189/hdl/upDownCounter_v1_0_S_AXI.vhd" \
+"../../../bd/system/sources/cont4b_Lento.vhd" \
+"../../../bd/system/ipshared/0189/hdl/upDownCounter_v1_0.vhd" \
+"../../../bd/system/ip/system_upDownCounter_0_0/sim/system_upDownCounter_0_0.vhd" \
+
+nosort

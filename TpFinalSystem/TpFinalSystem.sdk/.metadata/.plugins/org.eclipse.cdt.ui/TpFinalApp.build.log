@@ -1,0 +1,8 @@
+00:39:58 **** Incremental Build of configuration Debug for project TpFinalApp ****
+make pre-build main-build 
+a9-linaro-pre-build-step
+' '
+make: No se hace nada para `main-build'.
+
+00:39:59 Build Finished (took 529ms)
+
